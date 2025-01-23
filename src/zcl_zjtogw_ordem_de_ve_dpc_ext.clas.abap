@@ -139,7 +139,7 @@ CLASS ZCL_ZJTOGW_ORDEM_DE_VE_DPC_EXT IMPLEMENTATION.
       FROM zjto_ovcab
       WHERE ordemid = ld_ordemid.
 
-    IF sy-subcs = 0.
+    IF sy-subrc = 0.
       MOVE-CORRESPONDING ls_cab TO er_entity.
 
       er_entity-criadopor = ls_cab-criacao_usuario.
@@ -150,9 +150,9 @@ CLASS ZCL_ZJTOGW_ORDEM_DE_VE_DPC_EXT IMPLEMENTATION.
               TIME ZONE sy-zonlo.
     ELSE.
       lo_msg->add_message_text_only(
-      iv_msg_type = 'E'
-      iv_msg_text =  'ID da ordem não encontrado'
-    ).
+        iv_msg_type = 'E'
+        iv_msg_text =  'ID da ordem não encontrado'
+      ).
 
       RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception
         EXPORTING
@@ -166,9 +166,35 @@ CLASS ZCL_ZJTOGW_ORDEM_DE_VE_DPC_EXT IMPLEMENTATION.
           ls_cab       TYPE zjto_ovcab,
           ls_entityset LIKE LINE OF et_entityset.
 
+    DATA: lt_orderby TYPE STANDARD TABLE OF string,
+          ld_orderby TYPE string.
+
+    " montando orderby dinâmico
+    LOOP AT it_order INTO DATA(ls_order).
+      TRANSLATE ls_order-property TO UPPER CASE.
+      TRANSLATE ls_order-order TO UPPER CASE.
+      IF ls_order-order = 'DESC'.
+        ls_order-order = 'DESCENDING'.
+      ELSE.
+        ls_order-order = 'ASCENDING'.
+      ENDIF.
+      APPEND |{ ls_order-property } { ls_order-order }|
+          TO lt_orderby.
+    ENDLOOP.
+    CONCATENATE LINES OF lt_orderby INTO ld_orderby SEPARATED BY ', '.
+
+    " ordenação obrigatória caso nenhuma seja definida
+    IF ld_orderby = '' .
+      ld_orderby = 'OrdemId ASCENDING'.
+    ENDIF.
+
     SELECT *
-      INTO TABLE lt_cab
-      FROM zjto_ovcab.
+      FROM zjto_ovcab
+     WHERE (IV_FILTER_STRING)
+  ORDER BY (ld_orderby)
+      INTO TABLE @lt_cab
+     UP TO @is_paging-top ROWS
+    OFFSET @is_paging-skip.
 
     LOOP AT lt_cab INTO ls_cab.
       CLEAR ls_entityset.
