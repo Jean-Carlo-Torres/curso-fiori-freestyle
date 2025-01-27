@@ -258,6 +258,7 @@ CLASS ZCL_ZJTOGW_ORDEM_DE_VE_DPC_EXT IMPLEMENTATION.
 
 
   method OVCABSET_UPDATE_ENTITY.
+    DATA: ld_error TYPE flag.
     DATA(lo_msg) = me->/iwbep/if_mgw_conv_srv_runtime~get_message_container( ).
 
     io_data_provider->read_entry_data(
@@ -266,6 +267,31 @@ CLASS ZCL_ZJTOGW_ORDEM_DE_VE_DPC_EXT IMPLEMENTATION.
     ).
 
     er_entity-ordemid = it_key_tab[ name = 'OrdemId' ]-value.
+
+    " validação
+    IF er_entity-clienteid = 0.
+      ld_error = 'X'.
+      lo_msg->add_message_text_only(
+        iv_msg_type = 'E'
+        iv_msg_text = 'Cliente vazio'
+      ).
+    ENDIF.
+
+    IF er_entity-totalordem < 10.
+      ld_error = 'X'.
+      lo_msg->add_message(
+        iv_msg_type   = 'E'
+        iv_msg_id  = 'ZJTOOV'
+        iv_msg_number = 000
+        iv_msg_v1     = 'R$ 10,00'
+        iv_msg_v2     = |{ er_entity-ordemid }|
+      ).
+    ENDIF.
+
+    RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception
+      EXPORTING
+        message_container = lo_msg
+        http_status_code = 400.
 
     UPDATE zjto_ovcab
       SET clienteid  = er_entity-clienteid
